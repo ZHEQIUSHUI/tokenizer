@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-x86:
+    name: x86 Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Prepare 3rdparty
+        run: git submodule update --init
+
+      - name: Build x86
+        run: sh ./build.sh
+
+      - name: Upload x86 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-x86
+          path: build/install/
+
+  build-aarch64:
+    name: aarch64 Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Prepare 3rdparty
+        run: git submodule update --init
+
+      - name: Build aarch64
+        run: sh ./build_aarch64.sh
+
+      - name: Upload aarch64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-aarch64
+          path: build_aarch64/install/

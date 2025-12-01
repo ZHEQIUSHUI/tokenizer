@@ -23,6 +23,11 @@ public:
         return type == TEXT;
     }
 
+    bool is_stop(int token) override
+    {
+        return tokenizer->is_stop(token);
+    }
+
     std::vector<int> encode(const std::vector<Content> &contents) override
     {
         // check contents type
