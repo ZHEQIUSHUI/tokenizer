@@ -39,7 +39,17 @@ def main():
         text = tokenizer.apply_chat_template(
             [{"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},{"role": "user", "content": "你好"},{"role": "assistant", "content": "你好！有什么我可以帮助你的吗？"}],
             tokenize=False,
-            add_generation_prompt=False
+            add_generation_prompt=True
+        )
+        print("text: \n", text)
+        print("ids: \n", tokenizer.encode(text))
+        
+        
+        
+        text = tokenizer.apply_chat_template(
+            [{"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},{"role": "user", "content": "你好"}],
+            tokenize=False,
+            add_generation_prompt=True
         )
         print("text: \n", text)
         print("ids: \n", tokenizer.encode(text))

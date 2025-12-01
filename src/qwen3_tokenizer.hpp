@@ -68,6 +68,12 @@ public:
                 }
             }
         }
+
+        if (contents.back().role == USER)
+        {
+            text << "<|im_start|>assistant\n";
+        }
+
         ALOGD("text: \n%s", text.str().c_str());
         return tokenizer->encode(text.str());
     }
