@@ -118,5 +118,45 @@ int main(int argc, char *argv[])
         printf("}\n");
     }
 
+    // 不保留 thinking 内容
+    {
+        tokenizer->set_think_in_prompt(false);
+        std::vector<Content> contents = {
+            {SYSTEM, TEXT, "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+            {USER, TEXT, "你好"},
+            {ASSISTANT, TEXT, "</think>\n\n你好！有什么我可以帮助你的吗？"}};
+
+        std::vector<int> ids = tokenizer->encode(contents);
+        printf("ids size: %ld\n{", ids.size());
+        for (auto id : ids)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+
+        std::string text = tokenizer->decode(ids);
+        printf("text: \n%s\n", text.c_str());
+
+        contents.push_back({USER, TEXT, "你能做什么"});
+        auto ids2 = tokenizer->encode(contents);
+        printf("ids size: %ld\n{", ids2.size());
+        for (auto id : ids2)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+
+        text = tokenizer->decode(ids2);
+        printf("text: \n%s\n", text.c_str());
+
+        auto diff_ids = diff_token_ids(ids, ids2);
+        printf("diff_ids size: %ld\n{", diff_ids.size());
+        for (auto id : diff_ids)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+    }
+
     return 0;
 }

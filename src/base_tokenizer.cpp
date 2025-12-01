@@ -2,6 +2,7 @@
 #include <memory>
 #include "utils/object_register.hpp"
 #include "qwen3_tokenizer.hpp"
+#include <algorithm>
 
 std::shared_ptr<base_tokenizer> create_tokenizer(ModelType type)
 {
@@ -28,40 +29,38 @@ static std::string trim_copy(const std::string &s)
     return s.substr(start, end - start);
 }
 
-std::string base_tokenizer::remove_thinking(const std::string &text, std::string start_think_token, std::string end_think_token, bool trim)
+static inline void trim_inplace(std::string &s)
 {
-    std::string result;
-    result.reserve(text.size());
+    // 去掉前面空白
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
+                                    { return !std::isspace(ch); }));
+    // 去掉后面空白
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
+                         { return !std::isspace(ch); })
+                .base(),
+            s.end());
+}
 
-    size_t pos = 0;
-    while (true)
+std::string base_tokenizer::remove_thinking(const std::string &text, std::string end_think_token, bool trim)
+{
+    // 查找 token
+    size_t pos = text.find(end_think_token);
+
+    // 找不到 token：返回原文本（按需可更改）
+    if (pos == std::string::npos)
     {
-        size_t start = text.find(start_think_token, pos);
-        if (start == std::string::npos)
-        {
-            result.append(text.substr(pos));
-            break;
-        }
-
-        // append before <think>
-        result.append(text.substr(pos, start - pos));
-
-        // find </think>
-        size_t end = text.find(end_think_token, start + start_think_token.length());
-        if (end == std::string::npos)
-        {
-            // No closing tag → keep rest
-            break;
-        }
-
-        // skip the whole <think>...</think>
-        pos = end + end_think_token.length();
+        std::string result = text;
+        if (trim)
+            trim_inplace(result);
+        return result;
     }
 
-    // trim
+    // 提取 token 之后的内容
+    std::string result = text.substr(pos + end_think_token.size());
+
+    // 可选 trim
     if (trim)
-    {
-        return trim_copy(result);
-    }
+        trim_inplace(result);
+
     return result;
 }

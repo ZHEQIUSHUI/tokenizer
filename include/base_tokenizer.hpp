@@ -36,8 +36,8 @@ protected:
     // 是否在prompt中包含think标签, 默认为false
     bool think_in_prompt = false;
 
-    // 从文本中移除 start_think_token 和 end_think_token 之间的内容,并 trim 空格和换行符
-    std::string remove_thinking(const std::string &text, std::string start_think_token = "<think>", std::string end_think_token = "</think>", bool trim = true);
+    // 从文本中移除 end_think_token 之前的内容,并 trim 空格和换行符
+    std::string remove_thinking(const std::string &text, std::string end_think_token = "</think>", bool trim = true);
 
 public:
     virtual bool load(const std::string tokenizer_path) = 0;
