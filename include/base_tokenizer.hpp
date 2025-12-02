@@ -5,6 +5,7 @@
 
 enum ModelType
 {
+    Qwen2_5,
     Qwen3,
 };
 
@@ -33,7 +34,7 @@ struct Content
 class base_tokenizer
 {
 protected:
-    // 是否在prompt中包含think标签, 默认为false
+    // 是否在上下文中保留thinking内容, 默认为false
     bool think_in_prompt = false;
 
     // 从文本中移除 end_think_token 之前的内容,并 trim 空格和换行符

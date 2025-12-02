@@ -10,7 +10,7 @@ class qwen3_tokenizer : public base_tokenizer
 {
 private:
     std::shared_ptr<MNN::Transformer::Tokenizer> tokenizer;
-
+    bool add_generation_prompt = true;
 public:
     bool load(const std::string tokenizer_path) override
     {
@@ -69,7 +69,7 @@ public:
             }
         }
 
-        if (contents.back().role == USER)
+        if (contents.back().role == USER && add_generation_prompt)
         {
             text << "<|im_start|>assistant\n";
         }
@@ -88,3 +88,5 @@ public:
     }
 };
 REGISTER(Qwen3, qwen3_tokenizer)
+typedef qwen3_tokenizer qwen2_5_tokenizer;
+REGISTER(Qwen2_5, qwen2_5_tokenizer)
