@@ -9,7 +9,6 @@ enum ModelType
     Qwen3,
     Qwen3VL,
 
-    InternVL2_5,
     InternVL3,
 };
 
