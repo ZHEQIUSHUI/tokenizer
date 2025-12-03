@@ -12,7 +12,7 @@ project(tokenizer.axera)
 
 include_directories(include)
 
-add_library(tokenizer src/base_tokenizer.cpp src/tokenizer/tokenizer.cpp)
+add_library(tokenizer src/BaseTokenizer.cpp src/tokenizer/tokenizer.cpp)
 
 function(add_test test_name)
     add_executable(${test_name} tests/${test_name}.cpp)
@@ -23,4 +23,4 @@ add_test(test_tokenizer)
 
 
 install(TARGETS tokenizer DESTINATION lib)
-install(FILES include/base_tokenizer.hpp DESTINATION include)
+install(FILES include/BaseTokenizer.hpp DESTINATION include)

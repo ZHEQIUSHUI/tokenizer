@@ -1,20 +1,19 @@
-#include "base_tokenizer.hpp"
+#include "BaseTokenizer.hpp"
 #include <memory>
 #include "utils/object_register.hpp"
-#include "qwen3_tokenizer.hpp"
-#include "qwen3vl_tokenizer.hpp"
+#include "Qwen3Tokenizer.hpp"
 #include <algorithm>
 
-std::shared_ptr<base_tokenizer> create_tokenizer(ModelType type)
+std::shared_ptr<BaseTokenizer> create_tokenizer(ModelType type)
 {
     delete_fun destroy_fun = nullptr;
-    base_tokenizer *tokenizer = (base_tokenizer *)OBJFactory::getInstance().getObjectByID(type, destroy_fun);
+    BaseTokenizer *tokenizer = (BaseTokenizer *)OBJFactory::getInstance().getObjectByID(type, destroy_fun);
     if (!tokenizer)
     {
         fprintf(stderr, "create tokenizer failed");
         return nullptr;
     }
-    return std::shared_ptr<base_tokenizer>(tokenizer, destroy_fun);
+    return std::shared_ptr<BaseTokenizer>(tokenizer, destroy_fun);
 }
 
 static std::string trim_copy(const std::string &s)
@@ -42,7 +41,7 @@ static inline void trim_inplace(std::string &s)
             s.end());
 }
 
-std::string base_tokenizer::remove_thinking(const std::string &text, std::string end_think_token, bool trim)
+std::string BaseTokenizer::remove_thinking(const std::string &text, std::string end_think_token, bool trim)
 {
     // 查找 token
     size_t pos = text.find(end_think_token);

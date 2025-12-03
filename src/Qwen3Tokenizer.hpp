@@ -2,12 +2,13 @@
 #include <sstream>
 #include <algorithm>
 
-#include "base_tokenizer.hpp"
+#include "BaseTokenizer.hpp"
 #include "utils/object_register.hpp"
 #include "utils/sample_log.h"
 #include "tokenizer/tokenizer.hpp"
 
-class qwen3vl_tokenizer : public base_tokenizer
+template <ContentType... Types>
+class Qwen3Tokenizer : public BaseTokenizer
 {
 private:
     std::shared_ptr<MNN::Transformer::Tokenizer> tokenizer;
@@ -15,7 +16,7 @@ private:
     std::string video_pad_token = "<|video_pad|>";
     std::string image_pad_token = "<|image_pad|>";
 
-    std::vector<ContentType> support_types = {TEXT, IMAGE, VIDEO};
+    static constexpr ContentType support_types[] = {Types...};
 
 public:
     bool load(const std::string tokenizer_path) override
@@ -26,7 +27,7 @@ public:
 
     bool support(ContentType type) override
     {
-        return std::find(support_types.begin(), support_types.end(), type) != support_types.end();
+        return std::find(std::begin(support_types), std::end(support_types), type) != std::end(support_types);
     }
 
     bool is_stop(int token) override
@@ -119,4 +120,9 @@ public:
         return text.str();
     }
 };
+using qwen3vl_tokenizer = Qwen3Tokenizer<TEXT, IMAGE, VIDEO>;
 REGISTER(Qwen3VL, qwen3vl_tokenizer)
+using qwen3_tokenizer = Qwen3Tokenizer<TEXT>;
+REGISTER(Qwen3, qwen3_tokenizer)
+using qwen2_5_tokenizer = Qwen3Tokenizer<TEXT>;
+REGISTER(Qwen2_5, qwen2_5_tokenizer)

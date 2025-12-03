@@ -34,7 +34,7 @@ struct Content
     int num_media_tokens = 0; // 多模态token pad数量
 };
 
-class base_tokenizer
+class BaseTokenizer
 {
 protected:
     // 是否在上下文中保留thinking内容, 默认为false
@@ -57,4 +57,4 @@ public:
     virtual std::string decode(const std::vector<int> &ids) = 0;
 };
 
-std::shared_ptr<base_tokenizer> create_tokenizer(ModelType type);
+std::shared_ptr<BaseTokenizer> create_tokenizer(ModelType type);

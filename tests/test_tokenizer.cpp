@@ -1,6 +1,6 @@
 #include "cmdline.hpp"
 #include "magic_enum.hpp"
-#include "../include/base_tokenizer.hpp"
+#include "../include/BaseTokenizer.hpp"
 #include <iomanip>
 
 // ids1: {1,2,3}
@@ -25,7 +25,7 @@ std::vector<int> diff_token_ids(std::vector<int> ids1, std::vector<int> ids2)
     return diff_ids;
 }
 
-void test_text_tokenizer(std::shared_ptr<base_tokenizer> tokenizer)
+void test_text_tokenizer(std::shared_ptr<BaseTokenizer> tokenizer)
 {
     // 保留 thinking 内容
     {
@@ -148,7 +148,7 @@ void test_text_tokenizer(std::shared_ptr<base_tokenizer> tokenizer)
     }
 }
 
-void test_image_tokenizer(std::shared_ptr<base_tokenizer> tokenizer)
+void test_image_tokenizer(std::shared_ptr<BaseTokenizer> tokenizer)
 {
     {
         std::vector<Content> contents = {
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    std::shared_ptr<base_tokenizer> tokenizer = create_tokenizer((ModelType)model_type.value());
+    std::shared_ptr<BaseTokenizer> tokenizer = create_tokenizer((ModelType)model_type.value());
     if (!tokenizer->load(tokenizer_path))
     {
         fprintf(stderr, "load tokenizer failed");
