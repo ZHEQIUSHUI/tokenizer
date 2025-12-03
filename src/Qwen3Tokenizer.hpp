@@ -113,6 +113,12 @@ public:
         ALOGD("text: \n%s", text.str().c_str());
         return tokenizer->encode(text.str());
     }
+
+    std::vector<int> encode(const std::string &text) override
+    {
+        return tokenizer->encode(text);
+    }
+
     std::string decode(const std::vector<int> &ids) override
     {
         std::stringstream text;
@@ -121,6 +127,11 @@ public:
             text << tokenizer->decode(id);
         }
         return text.str();
+    }
+
+    std::string decode(int id) override
+    {
+        return tokenizer->decode(id);
     }
 };
 using qwen3vl_tokenizer = Qwen3Tokenizer<TEXT, IMAGE, VIDEO>;

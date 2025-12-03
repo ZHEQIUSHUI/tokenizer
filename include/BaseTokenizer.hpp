@@ -57,7 +57,9 @@ public:
     virtual bool is_stop(int token) = 0;
 
     virtual std::vector<int> encode(const std::vector<Content> &contents) = 0;
+    virtual std::vector<int> encode(const std::string &text) = 0;
     virtual std::string decode(const std::vector<int> &ids) = 0;
+    virtual std::string decode(int id) = 0;
 };
 
 std::shared_ptr<BaseTokenizer> create_tokenizer(ModelType type);
