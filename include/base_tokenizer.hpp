@@ -7,6 +7,7 @@ enum ModelType
 {
     Qwen2_5,
     Qwen3,
+    Qwen3VL
 };
 
 enum RoleType
@@ -29,6 +30,8 @@ struct Content
     RoleType role;
     ContentType type;
     std::string data;
+    int num_media = 0; // 多模态数量
+    int num_media_tokens = 0; // 多模态token pad数量
 };
 
 class base_tokenizer

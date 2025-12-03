@@ -2,6 +2,7 @@
 #include <memory>
 #include "utils/object_register.hpp"
 #include "qwen3_tokenizer.hpp"
+#include "qwen3vl_tokenizer.hpp"
 #include <algorithm>
 
 std::shared_ptr<base_tokenizer> create_tokenizer(ModelType type)

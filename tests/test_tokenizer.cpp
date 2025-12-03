@@ -1,5 +1,7 @@
 #include "cmdline.hpp"
+#include "magic_enum.hpp"
 #include "../include/base_tokenizer.hpp"
+#include <iomanip>
 
 // ids1: {1,2,3}
 // ids2: {1,2,3,4,5}
@@ -23,21 +25,8 @@ std::vector<int> diff_token_ids(std::vector<int> ids1, std::vector<int> ids2)
     return diff_ids;
 }
 
-int main(int argc, char *argv[])
+void test_text_tokenizer(std::shared_ptr<base_tokenizer> tokenizer)
 {
-    std::string tokenizer_path = "../tests/assets/qwen3_tokenizer.txt";
-    cmdline::parser a;
-    a.add<std::string>("tokenizer_path", 't', "tokenizer path", true);
-    a.parse_check(argc, argv);
-    tokenizer_path = a.get<std::string>("tokenizer_path");
-
-    std::shared_ptr<base_tokenizer> tokenizer = create_tokenizer(Qwen3);
-    if (!tokenizer->load(tokenizer_path))
-    {
-        fprintf(stderr, "load tokenizer failed");
-        return -1;
-    }
-
     // 保留 thinking 内容
     {
         tokenizer->set_think_in_prompt(true);
@@ -157,6 +146,105 @@ int main(int argc, char *argv[])
         }
         printf("}\n");
     }
+}
 
+void test_image_tokenizer(std::shared_ptr<base_tokenizer> tokenizer)
+{
+    {
+        std::vector<Content> contents = {
+            {SYSTEM, TEXT, "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+            {USER, TEXT, "你好"},
+            {ASSISTANT, TEXT, "你好！有什么我可以帮助你的吗？"}};
+
+        std::vector<int> ids = tokenizer->encode(contents);
+        printf("ids size: %ld\n{", ids.size());
+        for (auto id : ids)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+
+        std::string text = tokenizer->decode(ids);
+        printf("text: \n%s\n", text.c_str());
+
+        contents.push_back({USER, IMAGE, "帮我看看这张图片", 1, 256});
+
+        auto ids2 = tokenizer->encode(contents);
+        printf("ids size: %ld\n{", ids2.size());
+        for (auto id : ids2)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+
+        text = tokenizer->decode(ids2);
+        printf("text: \n%s\n", text.c_str());
+    }
+
+    {
+        std::vector<Content> contents = {
+            {SYSTEM, TEXT, "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+            {USER, TEXT, "你好"},
+            {ASSISTANT, TEXT, "你好！有什么我可以帮助你的吗？"}};
+
+        std::vector<int> ids = tokenizer->encode(contents);
+        printf("ids size: %ld\n{", ids.size());
+        for (auto id : ids)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+
+        std::string text = tokenizer->decode(ids);
+        printf("text: \n%s\n", text.c_str());
+
+        contents.push_back({USER, VIDEO, "帮我看看这个视频", 8, 256});
+
+        auto ids2 = tokenizer->encode(contents);
+        printf("ids size: %ld\n{", ids2.size());
+        for (auto id : ids2)
+        {
+            printf("%d, ", id);
+        }
+        printf("}\n");
+
+        text = tokenizer->decode(ids2);
+        printf("text: \n%s\n", text.c_str());
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    std::stringstream model_type_str;
+    model_type_str << "model type: \033[32m";
+    for (auto name : magic_enum::enum_names<ModelType>())
+    {
+        model_type_str << std::setw(10) << name << " :" << magic_enum::enum_cast<ModelType>(name).value() << " ";
+    }
+    model_type_str << "\033[0m";
+
+    std::string tokenizer_path = "../tests/assets/qwen3_tokenizer.txt";
+    cmdline::parser a;
+    a.add<std::string>("tokenizer_path", 't', "tokenizer path", true);
+    a.add<int>("model_type", 'm', model_type_str.str(), true);
+
+    a.parse_check(argc, argv);
+    tokenizer_path = a.get<std::string>("tokenizer_path");
+    auto model_type = magic_enum::enum_cast<ModelType>(a.get<int>("model_type"));
+    if (!model_type.has_value())
+    {
+        fprintf(stderr, "model type %d not found, please check model type in %s\n", a.get<int>("model_type"), model_type_str.str().c_str());
+        return -1;
+    }
+
+    std::shared_ptr<base_tokenizer> tokenizer = create_tokenizer((ModelType)model_type.value());
+    if (!tokenizer->load(tokenizer_path))
+    {
+        fprintf(stderr, "load tokenizer failed");
+        return -1;
+    }
+
+    test_text_tokenizer(tokenizer);
+    test_image_tokenizer(tokenizer);
     return 0;
 }
