@@ -116,13 +116,13 @@ public:
                 if (!this->think_in_prompt)
                 {
                     auto cleaned_data = this->remove_thinking(content.data);
-                    text << "<|im_start|>assistant\n"
-                         << cleaned_data << "<|im_end|>\n";
+                    text << "Assistant:"
+                         << cleaned_data << "<end_of_utterance>\n";
                 }
                 else
                 {
-                    text << "<|im_start|>assistant\n"
-                         << content.data << "<|im_end|>\n";
+                    text << "Assistant:"
+                         << content.data << "<end_of_utterance>\n";
                 }
             }
         }
