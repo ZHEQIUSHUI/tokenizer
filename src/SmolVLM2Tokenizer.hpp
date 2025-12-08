@@ -136,5 +136,4 @@ public:
         return this->tokenizer->encode(text.str());
     }
 };
-// using qwen3vl_tokenizer = Qwen3Tokenizer<TEXT, IMAGE, VIDEO>;
 REGISTER(SmolVLM2, SmolVLM2Tokenizer)
