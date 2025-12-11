@@ -22,8 +22,14 @@ function(add_test test_name)
     target_link_libraries(${test_name} tokenizer)
 endfunction()
 
-add_test(test_tokenizer)
-add_test(test_num2words_en)
+# option to build tests
+option(TOKENIZER_BUILD_TESTS "Build tests" ON)
+MESSAGE(STATUS "TOKENIZER_BUILD_TESTS = ${TOKENIZER_BUILD_TESTS}")
+
+if(TOKENIZER_BUILD_TESTS)
+    add_test(test_tokenizer)
+    add_test(test_num2words_en)
+endif()
 
 
 install(TARGETS tokenizer DESTINATION lib)
