@@ -101,7 +101,7 @@ public:
         std::stringstream text;
         for (auto id : ids)
         {
-            text << tokenizer->decode(id);
+            text << decode(id);
         }
         return text.str();
     }

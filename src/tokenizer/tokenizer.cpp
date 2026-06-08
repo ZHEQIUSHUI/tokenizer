@@ -830,7 +830,7 @@ void HuggingfaceTokenizer::bpe(const std::wstring& token, const BPERanks& bpe_ra
 }
 
 void HuggingfaceTokenizer::encode(const std::string& str, std::vector<int>& ids) {
-    std::regex re("('s|'t|'re|'ve|'m|'ll|'d| ?[[:alpha:]]+| ?[[:digit:]]+| ?[^\\s\\w]+|\\s+)");
+    std::regex re("('s|'t|'re|'ve|'m|'ll|'d|[^\\r\\n[:alpha:][:digit:]]?[[:alpha:]]+|[[:digit:]]| ?[^[:space:][:alpha:][:digit:]]+[\\r\\n]*|\\s+)");
     std::string input = str;
     std::vector<std::string> result;
     std::string token;

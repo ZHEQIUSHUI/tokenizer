@@ -32,6 +32,9 @@ enum ModelType
     PaddleOCRVL,  // 24
     Gemma4,       // 25 (google/gemma-4-*-it)
     Gemma4VL,     // 26
+    MiniCPMV46,   // 27
+    MiniCPMV46VL, // 28
+    MiniCPM5,     // 29
 };
 
 enum RoleType
@@ -49,6 +52,13 @@ enum ContentType
     VIDEO,
 };
 
+enum class ThinkingMode
+{
+    Unspecified,
+    Think,
+    NoThink,
+};
+
 struct Content
 {
     RoleType role;
@@ -63,6 +73,7 @@ class BaseTokenizer
 protected:
     // 是否在上下文中保留thinking内容, 默认为false
     bool think_in_prompt = false;
+    ThinkingMode generation_thinking_mode = ThinkingMode::Unspecified;
 
 public:
     virtual bool load(const std::string tokenizer_path) = 0;
@@ -70,6 +81,10 @@ public:
     virtual void set_think_in_prompt(bool think_in_prompt)
     {
         this->think_in_prompt = think_in_prompt;
+    }
+    virtual void set_generation_thinking_mode(ThinkingMode mode)
+    {
+        this->generation_thinking_mode = mode;
     }
 
     virtual bool is_stop(int token) = 0;
