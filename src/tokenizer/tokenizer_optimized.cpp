@@ -1,4 +1,5 @@
 #include "tokenizer_optimized.hpp"
+#include "unicode_categories.hpp"
 #include <fstream>
 #include <sstream>
 #include <queue>
@@ -509,11 +510,13 @@ std::string Sentencepiece::decode(int id) const {
         char byte = (char)((hex2val(sp.piece[3]) << 4) | hex2val(sp.piece[4]));
         return std::string(1, byte);
     }
-    auto piece = sp.piece;
-    int pos = piece.find("▁");
-    if (pos != -1) {
-        piece.replace(pos, pos + 3, " ");
-    }
+    // Replace every U+2581 ("▁", 3 UTF-8 bytes) with a space. The previous code
+    // used piece.replace(pos, pos + 3, " ") which (a) only handled the first
+    // occurrence and (b) passed pos+3 as the length argument, over-deleting when
+    // the marker was not at offset 0 (e.g. "▁▁" indentation tokens). replace_all
+    // matches the SpaceReplaceBPE decode path below.
+    std::string piece = sp.piece;
+    replace_all(piece, u8"▁", " ");
     return piece;
 }
 
@@ -575,11 +578,18 @@ void Tiktoken::build_trie() {
 
     for (int id = 0; id < (int)decoder_.size(); ++id) {
         const std::string& tok = decoder_[id];
+        if (tok.empty()) continue;
         int node = 0;
         for (unsigned char c : tok) {
             node = trie_add_next(node, c);
         }
-        trie_[node].id = id;
+        // First (lowest-id) wins for duplicate token strings, matching the
+        // reference engine's encoder_.insert() semantics (insert keeps the first).
+        // A plain assignment would let a later duplicate (e.g. an added-token row
+        // rendering to the same bytes) shadow the real BPE token id.
+        if (trie_[node].id == -1) {
+            trie_[node].id = id;
+        }
     }
 }
 
@@ -850,6 +860,9 @@ bool HuggingfaceTokenizer::load_vocab(std::ifstream& tok_file) {
     std::getline(tok_file, line);
     std::istringstream line_str(line);
     line_str >> vocab_len >> merge_len;
+    // Optional 3rd field: pre-tokenizer family id (added for HF-faithful encoding).
+    // Absent in legacy assets -> stays 0 (legacy hand-rolled splitter).
+    line_str >> pretok_family_;
     // load vocab
     decoder_.resize(vocab_len);
     for (int i = 0; i < vocab_len; i++) {
@@ -1005,6 +1018,156 @@ void HuggingfaceTokenizer::bpe(const std::wstring& token, const BPERanks& bpe_ra
     }
 }
 
+// ---- Unicode-aware BPE pre-tokenizer ---------------------------------------
+// Reproduces the HuggingFace `pre_tokenizer` regex of each model family exactly,
+// operating on decoded Unicode codepoints (no std::regex, no ICU). Validated to
+// match tokenizers' pre_tokenize_str() span-for-span. Each emitted span is then
+// byte-level mapped + BPE-merged by emit_token(), as HF does after splitting.
+namespace {
+struct PreTokParams { int digit_max; bool cased; bool marks_in_letter; bool slash_trail; };
+
+// family ids must stay in sync with convert_tokenizer.py and the .hpp comment.
+static PreTokParams pretok_params(int family) {
+    switch (family) {
+        case 1: return {1, false, true,  false}; // Qwen:    \p{N}     | [\p{L}\p{M}]+
+        case 2: return {1, false, false, false}; // MiniCPM: \p{N}     | \p{L}+
+        case 3: return {3, false, false, false}; // GLM:     \p{N}{1,3}| \p{L}+
+        case 4: return {3, true,  false, true};  // o200k:   cased letter runs, \p{N}{1,3}, [\r\n/]*
+        default:return {1, false, false, false};
+    }
+}
+
+// Decode UTF-8 into codepoints with byte offsets. offs has size cps+1, offs.back()==str.size().
+// Malformed bytes are kept as their raw value (length 1), matching utf8_to_wstring's leniency.
+static void decode_utf8_cps(const std::string& s, std::vector<uint32_t>& cps, std::vector<size_t>& offs) {
+    const unsigned char* p = (const unsigned char*)s.data();
+    const size_t n = s.size();
+    size_t i = 0;
+    auto cont = [](unsigned char c){ return (c & 0xC0) == 0x80; };
+    while (i < n) {
+        const unsigned char c0 = p[i];
+        uint32_t cp; size_t adv;
+        if (c0 < 0x80) { cp = c0; adv = 1; }
+        else if ((c0 & 0xE0) == 0xC0 && i + 1 < n && cont(p[i+1])) {
+            cp = ((uint32_t)(c0 & 0x1F) << 6) | (uint32_t)(p[i+1] & 0x3F); adv = 2;
+            if (cp < 0x80) { cp = c0; adv = 1; }
+        }
+        else if ((c0 & 0xF0) == 0xE0 && i + 2 < n && cont(p[i+1]) && cont(p[i+2])) {
+            cp = ((uint32_t)(c0 & 0x0F) << 12) | ((uint32_t)(p[i+1] & 0x3F) << 6) | (uint32_t)(p[i+2] & 0x3F); adv = 3;
+            if (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF)) { cp = c0; adv = 1; }
+        }
+        else if ((c0 & 0xF8) == 0xF0 && i + 3 < n && cont(p[i+1]) && cont(p[i+2]) && cont(p[i+3])) {
+            cp = ((uint32_t)(c0 & 0x07) << 18) | ((uint32_t)(p[i+1] & 0x3F) << 12) |
+                 ((uint32_t)(p[i+2] & 0x3F) << 6) | (uint32_t)(p[i+3] & 0x3F); adv = 4;
+            if (cp < 0x10000 || cp > 0x10FFFF) { cp = c0; adv = 1; }
+        }
+        else { cp = c0; adv = 1; }
+        offs.push_back(i);
+        cps.push_back(cp);
+        i += adv;
+    }
+    offs.push_back(n);
+}
+
+static void pretokenize_unicode(const std::string& str, int family,
+                                std::vector<std::pair<size_t, size_t>>& spans) {
+    const PreTokParams P = pretok_params(family);
+    std::vector<uint32_t> cp;
+    std::vector<size_t> off;
+    decode_utf8_cps(str, cp, off);
+    const size_t m = cp.size();
+
+    auto is_letter = [&](uint32_t c){ return uc_is_L(c) || (P.marks_in_letter && uc_is_M(c)); };
+    auto is_other  = [&](uint32_t c){
+        if (uc_is_space(c) || uc_is_L(c) || uc_is_N(c)) return false;
+        if (P.marks_in_letter && uc_is_M(c)) return false;
+        return true;
+    };
+    auto clsA = [&](uint32_t c){ return (uc_is_L(c) && !uc_is_Ll(c)) || uc_is_M(c); };          // [\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]
+    auto clsB = [&](uint32_t c){ return (uc_is_L(c) && !uc_is_Lu(c) && !uc_is_Lt(c)) || uc_is_M(c); }; // [\p{Ll}\p{Lm}\p{Lo}\p{M}]
+    auto lower = [](uint32_t c){ return (c >= 'A' && c <= 'Z') ? c + 32 : c; };
+    auto match_contr = [&](size_t i) -> size_t {
+        if (i + 1 >= m || cp[i] != '\'') return 0;
+        const uint32_t c1 = lower(cp[i+1]);
+        if (c1=='s' || c1=='t' || c1=='m' || c1=='d') return 2;
+        if (i + 2 < m) {
+            const uint32_t c2 = lower(cp[i+2]);
+            if ((c1=='r'&&c2=='e') || (c1=='v'&&c2=='e') || (c1=='l'&&c2=='l')) return 3;
+        }
+        return 0;
+    };
+    auto emit = [&](size_t a, size_t b){ spans.emplace_back(off[a], off[b]); };
+
+    size_t i = 0;
+    while (i < m) {
+        const uint32_t c = cp[i];
+        // 1) contraction (simple families match it as a leading alternative)
+        if (!P.cased) {
+            const size_t mc = match_contr(i);
+            if (mc) { emit(i, i + mc); i += mc; continue; }
+        }
+        // 2) letter run
+        if (P.cased) {
+            size_t j = i; bool lead = false;
+            if (c != '\r' && c != '\n' && !uc_is_L(c) && !uc_is_N(c) &&
+                i + 1 < m && (uc_is_L(cp[i+1]) || uc_is_M(cp[i+1]))) { j = i + 1; lead = true; }
+            if (lead || uc_is_L(c) || uc_is_M(c)) {
+                size_t end;
+                size_t k1 = j; while (k1 < m && clsA(cp[k1])) ++k1;
+                size_t b = k1; while (b < m && clsB(cp[b])) ++b;
+                if (b > k1) { end = b; }
+                else {
+                    size_t k2 = j; while (k2 < m && clsA(cp[k2])) ++k2;
+                    if (k2 > j) { size_t bb = k2; while (bb < m && clsB(cp[bb])) ++bb; end = bb; }
+                    else end = j;
+                }
+                if (end > j) {
+                    end += match_contr(end);
+                    emit(i, end); i = end; continue;
+                }
+            }
+        } else {
+            size_t j = i; bool lead = false;
+            if (c != '\r' && c != '\n' && !uc_is_L(c) && !uc_is_N(c) &&
+                i + 1 < m && is_letter(cp[i+1])) { j = i + 1; lead = true; }
+            if (lead || is_letter(c)) {
+                size_t k = j; while (k < m && is_letter(cp[k])) ++k;
+                if (k > j) { emit(i, k); i = k; continue; }
+            }
+        }
+        // 3) number: \p{N}{1,digit_max}
+        if (uc_is_N(c)) {
+            size_t k = i; int cnt = 0;
+            while (k < m && uc_is_N(cp[k]) && cnt < P.digit_max) { ++k; ++cnt; }
+            emit(i, k); i = k; continue;
+        }
+        // 4) punctuation:  ?[^\s\p{L}(\p{M})\p{N}]+ [\r\n(/)]*
+        {
+            size_t j = i;
+            if (c == ' ' && i + 1 < m && is_other(cp[i+1])) j = i + 1;
+            if (j < m && is_other(cp[j])) {
+                size_t k = j; while (k < m && is_other(cp[k])) ++k;
+                while (k < m && (cp[k]=='\r' || cp[k]=='\n' || (P.slash_trail && cp[k]=='/'))) ++k;
+                emit(i, k); i = k; continue;
+            }
+        }
+        // 5/6/7) whitespace: \s*[\r\n]+ | \s+(?!\S) | \s+
+        if (uc_is_space(c)) {
+            size_t e = i; while (e < m && uc_is_space(cp[e])) ++e;
+            long last_nl = -1;
+            for (size_t k = i; k < e; ++k) if (cp[k]=='\n' || cp[k]=='\r') last_nl = (long)k;
+            size_t seg;
+            if (last_nl >= 0) seg = (size_t)last_nl + 1 - i;          // up to & incl last newline
+            else if (e < m)  seg = (e - i > 1) ? (e - i - 1) : 1;     // followed by non-space: all but last
+            else             seg = e - i;                            // EOF: whole run
+            emit(i, i + seg); i += seg; continue;
+        }
+        // fallback: single codepoint
+        emit(i, i + 1); ++i;
+    }
+}
+} // anonymous namespace
+
 void HuggingfaceTokenizer::encode(const std::string& str, std::vector<int>& ids) {
     if (mode_ == Mode::SpaceReplaceBPE) {
         std::string normalized;
@@ -1084,6 +1247,17 @@ void HuggingfaceTokenizer::encode(const std::string& str, std::vector<int>& ids)
             ids.push_back(iter->second);
         }
     };
+
+    // Unicode-aware pre-tokenization for known model families (matches HF exactly).
+    // Falls back to the legacy ASCII splitter below when the asset carries no family.
+    if (pretok_family_ != 0) {
+        std::vector<std::pair<size_t, size_t>> spans;
+        pretokenize_unicode(str, pretok_family_, spans);
+        for (const auto& sp : spans) {
+            emit_token(str.data() + sp.first, str.data() + sp.second);
+        }
+        return;
+    }
 
     const char *data = str.data();
     const size_t n = str.size();

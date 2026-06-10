@@ -15,6 +15,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(include)
+include_directories(src)
 
 add_library(tokenizer src/BaseTokenizer.cpp src/tokenizer/tokenizer_optimized.cpp)
 set_target_properties(tokenizer PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -32,6 +33,7 @@ if(TOKENIZER_BUILD_TESTS)
     add_test(test_tokenizer)
     add_test(test_num2words_en)
     add_test(test_string_create)
+    add_test(test_hf_parity)
 endif()
 
 

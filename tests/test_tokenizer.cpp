@@ -137,7 +137,10 @@ bool run_text_test(std::shared_ptr<BaseTokenizer> tokenizer, const TextTestCase&
     // 验证 round-trip
     bool round_trip_ok = (decoded == chat_template);
     if (!round_trip_ok) {
-        printf("%sWarning: decode(encode(text)) != text%s\n", color::yellow, color::reset);
+        printf("%s[FAIL] decode(encode(text)) != text%s\n", color::red, color::reset);
+        printf("  expected: %s\n  got:      %s\n", chat_template.c_str(), decoded.c_str());
+        g_stats.failed++;
+        return false;
     }
     
     // 测试增量对话
@@ -154,12 +157,17 @@ bool run_text_test(std::shared_ptr<BaseTokenizer> tokenizer, const TextTestCase&
         print_ids(diff_ids, "diff_ids");
     }
     
-    // 验证 diff 正确性
-    bool diff_ok = !diff_ids.empty();
+    // 验证增量编码确实追加了内容。注意:不能假设旧 ids 是新 ids2 的前缀——许多 chat
+    // 模板在追加新轮时会改写结尾(generation prompt / thinking 标记),并非前缀稳定。
+    // 唯一稳健的不变量是:多了一轮用户内容,token 总数应增加。
+    bool diff_ok = ids2.size() > ids.size();
     if (!diff_ok) {
-        printf("%sWarning: diff_ids is empty (new content not appended?)%s\n", color::yellow, color::reset);
+        printf("%s[FAIL] new turn did not increase token count (%zu -> %zu)%s\n",
+               color::red, ids.size(), ids2.size(), color::reset);
+        g_stats.failed++;
+        return false;
     }
-    
+
     printf("%s%s[PASS] %s%s\n", color::green, color::bold, test_case.name, color::reset);
     g_stats.passed++;
     return true;
