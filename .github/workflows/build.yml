@@ -24,6 +24,12 @@ jobs:
       - name: Build x86
         run: sh ./build.sh
 
+      - name: Run tests
+        run: |
+          set -e
+          ./build/test_string_create
+          ./build/test_hf_parity tests
+
       - name: Upload x86 artifact
         uses: actions/upload-artifact@v4
         with:

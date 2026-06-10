@@ -126,6 +126,51 @@ class LlmExporter():
 
         return vocab_list, merge_list
 
+    def _pretok_family(self):
+        """Detect the BPE pre-tokenizer family so the device engine can reproduce the
+        model's HuggingFace pre_tokenizer regex exactly (see tokenizer_optimized.cpp).
+          0 = legacy/unknown (engine falls back to its ASCII splitter)
+          1 = Qwen    ( [\\p{L}\\p{M}]+ , single \\p{N} )
+          2 = MiniCPM ( \\p{L}+ , single \\p{N} )
+          3 = GLM     ( \\p{L}+ , \\p{N}{1,3} )
+          4 = o200k   ( cased letter runs, \\p{N}{1,3}, [\\r\\n/]* )  -- gpt-oss / MiniMax
+        """
+        tokenizer_json = self._resolve_local_file('tokenizer.json')
+        if tokenizer_json is None:
+            return 0
+        try:
+            with open(tokenizer_json, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+        except Exception:
+            return 0
+        regexes = []
+        def walk(p):
+            if not isinstance(p, dict):
+                return
+            if p.get('type') == 'Split' and isinstance(p.get('pattern'), dict):
+                r = p['pattern'].get('Regex')
+                if r:
+                    regexes.append(r)
+            for sub in p.get('pretokenizers', []) or []:
+                walk(sub)
+        walk(cfg.get('pre_tokenizer') or {})
+        if not regexes:
+            return 0
+        rx = '\n'.join(regexes)
+        cased = ('\\p{Lu}' in rx) or ('\\p{Lt}' in rx)
+        marks = '\\p{L}\\p{M}' in rx
+        digit3 = '\\p{N}{1,3}' in rx
+        if cased:
+            family = 4
+        elif marks:
+            family = 1
+        elif digit3:
+            family = 3
+        else:
+            family = 2
+        print(f'[convert_tokenizer] pre_tokenizer family = {family}')
+        return family
+
     def _ensure_fastvlm_image_single_token(self):
         # FastVLM vision injection expects "<image>" to map to a single token id.
         # Keep this logic isolated to FastVLM to avoid changing behavior of other models.
@@ -331,8 +376,11 @@ class LlmExporter():
                 fp.write(f'{len(vocab_list)}\n')
                 for vocab in vocab_list:
                     fp.write(vocab)
-        elif self.merge_txt is not None:
-            # huggingface tokenizer
+        elif self.merge_txt is not None and (tokenizer_json_bpe is None or force_huggingface_export):
+            # huggingface tokenizer via merges.txt. Only used when tokenizer.json carries no
+            # usable BPE (or FastVLM forces this path): a model's merges.txt can be a stale or
+            # partial subset of tokenizer.json's merges (observed on MiniCPM, where the missing
+            # CJK merges broke Chinese tokenization), so tokenizer.json is preferred below.
             merge_list = []
             vocab = self.tokenizer.get_vocab()
             special_list = list(self.tokenizer.added_tokens_decoder.keys())
@@ -345,9 +393,10 @@ class LlmExporter():
                 for line in merge.readlines():
                     merge_list.append(line)
             # write to tokenizer.txt
+            family = self._pretok_family()
             with open(file_path, "w", encoding="utf8") as fp:
                 write_header(fp, HUGGINGFACE, special_list)
-                fp.write(f'{len(vocab_list)} {len(merge_list)}\n')
+                fp.write(f'{len(vocab_list)} {len(merge_list)} {family}\n')
                 for v in vocab_list:
                     fp.write(v + '\n')
                 for m in merge_list:
@@ -357,16 +406,32 @@ class LlmExporter():
             # (for example Gemma4). Export it as type 3 to preserve BPE merge ranks.
             vocab_list, merge_list = tokenizer_json_bpe
             special_list = list(self.tokenizer.added_tokens_decoder.keys())
+            family = self._pretok_family()
+
+            # GPT-2 byte-level pieces never contain whitespace (space->Ġ, newline->Ċ), so they
+            # can be written verbatim. Only b64-encode the rare token that would break the
+            # line / space-separated-merge format (contains whitespace, or literally starts
+            # with the "b64:" sentinel). This keeps the asset roughly half the size of
+            # encoding everything while staying lossless. The device parser accepts both forms.
+            def b64(tok):
+                return 'b64:' + base64.b64encode(tok.encode('utf-8')).decode('utf8')
+            def vocab_bad(tok):
+                return ('\n' in tok) or ('\r' in tok) or tok.startswith('b64:') or tok == ''
+            def merge_bad(tok):
+                return vocab_bad(tok) or (' ' in tok) or ('\t' in tok)
+
             with open(file_path, "w", encoding="utf8") as fp:
                 write_header(fp, HUGGINGFACE, special_list)
-                fp.write(f'{len(vocab_list)} {len(merge_list)}\n')
+                fp.write(f'{len(vocab_list)} {len(merge_list)} {family}\n')
                 for token in vocab_list:
-                    token_encode = base64.b64encode(token.encode("utf-8")).decode("utf8")
-                    fp.write(f'b64:{token_encode}\n')
+                    fp.write((b64(token) if vocab_bad(token) else token) + '\n')
                 for left, right in merge_list:
-                    left_encode = base64.b64encode(left.encode("utf-8")).decode("utf8")
-                    right_encode = base64.b64encode(right.encode("utf-8")).decode("utf8")
-                    fp.write(f'b64:{left_encode} b64:{right_encode}\n')
+                    # The device merge parser requires both sides in the same form, so if
+                    # either side needs b64 we encode both.
+                    if merge_bad(left) or merge_bad(right):
+                        fp.write(b64(left) + ' ' + b64(right) + '\n')
+                    else:
+                        fp.write(left + ' ' + right + '\n')
         else:
             # tiktoken or bert
             if 'bert' in type(self.tokenizer).__name__.lower():

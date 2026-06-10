@@ -1,0 +1,69 @@
+Hello, World!
+hello world
+The quick brown fox jumps over the lazy dog.
+I'm sure you don't think we'll regret it; they've got it, he's right, I'd go.
+12345
+x123y
+ 2024 is the year
+3.14159265358979
+1,000,000 dollars
+007 agent 42 answer 100000000
+abc123def456
+!!!???...
+a---b===c+++d
+(parentheses) [brackets] {braces} <angles>
+foo_bar baz__qux
+def foo(x): return x + 1
+const int N = 100; for(i=0;i<N;i++){a[i]=i*2;}
+你好世界
+你好，世界！这是中文测试。
+café naïve résumé über
+Ω≈ç√∫˜µ≤≥÷
+emoji test 😀🎉🚀❤️👍
+mixed 中文 and English 123 with 'contractions
+   leading spaces
+trailing spaces
+a  b   c    d
+tab\there\tand\tthere
+line1\nline2\nline3
+\n\n\nblank lines above
+<|im_start|>system\nYou are a helpful assistant.<|im_end|>
+<think>reasoning here</think>final answer
+https://example.com/path?query=1&x=2#frag
+user@example.com
+snake_case camelCase PascalCase kebab-case
+0x1F600 \\backslash \\\\ double
+The year was 1984, and 99.9% agreed by 2025!
+ThisIsAVeryLongWordWithoutAnySpacesToStressTheLongestMatchPathInTheTokenizerEngine
+數字 ２０２４ 全角
+ｱｲｳ half-width kana
+Ⅰ Ⅱ Ⅲ roman numerals
+combining é (e + accent)
+0 1 12 123 1234 12345 123456 1234567890
+3.14 2,718 1_000 0x1F 1e10 +42 -7 ٣٤٥ ۱۲۳
+year2024and2025
+ⅣⅤⅥ ½ ¾ ① ② ③ ㊀ ㊁
+你好世界这是一个比较长的中文句子用来测试分词边界
+日本語のテスト ひらがな カタカナ 漢字混じり
+한국어 테스트 문장입니다
+café CAFÉ Café naïve über Größe ﬁ ﬂ
+é à combining marks test
+ΑΒΓ αβγ ΏΩ μ²
+emoji 😀 👨‍👩‍👧‍👦 🏳️‍🌈 flag end
+   three leading
+trailing three   
+tab\tafter\ttabs
+mix\n\nblanks\n\n\nhere
+a/b/c/d path//double
+snake_case SCREAMING_CASE camelCaseWord PascalCaseWord
+don't can't won't y'all o'clock I'LL HE'S
+<|im_start|>user<|im_end|>
+... !!! ??? --- ===  ~~~ ***
+(())[][]{}<><>
+https://a.b.c/x?y=1&z=2#h
+$100 €50 £20 ¥1000 50% 3°C
+   
+\t\t\t
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
+supercalifragilisticexpialidocioussupercalifragilistic
+αναβ12γδ34 mixed3scripts你好5world

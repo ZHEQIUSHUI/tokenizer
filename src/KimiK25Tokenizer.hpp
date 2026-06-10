@@ -91,7 +91,7 @@ public:
             }
             else if (content.role == ASSISTANT)
             {
-                text << "<|im_assistant|>assistant<|im_middle|<think></think>";
+                text << "<|im_assistant|>assistant<|im_middle|><think></think>";
                 
                 if (!this->think_in_prompt)
                 {
@@ -198,7 +198,7 @@ public:
         // Add generation prompt
         if (contents.size() > 0 && contents.back().role == USER && add_generation_prompt)
         {
-            text << "<|im_assistant|>assistant<|im_middle|<think>";
+            text << "<|im_assistant|>assistant<|im_middle|><think>";
         }
 
         return text.str();

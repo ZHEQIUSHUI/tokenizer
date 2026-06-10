@@ -202,6 +202,10 @@ private:
     std::string byte_to_piece(unsigned char c) const;
     BPERanks bpe_ranks_;
     Mode mode_ = Mode::GPT2ByteBPE;
+    // Pre-tokenizer family for GPT2ByteBPE mode (matches the model's HF pre_tokenizer regex).
+    // 0 = legacy hand-rolled ASCII splitter (back-compat default for assets without the field);
+    // 1 = Qwen, 2 = MiniCPM/Llama, 3 = GLM, 4 = o200k. See pretok_params() in the .cpp.
+    int pretok_family_ = 0;
     // Fast byte -> unicode mapping for encoding (covers all 256 possible bytes)
     std::array<wchar_t, 256> b2u_{};
     std::unordered_map<wchar_t, uint8_t> u2b_;
