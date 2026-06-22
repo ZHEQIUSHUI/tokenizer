@@ -20,6 +20,11 @@ protected:
     std::string audio_end_token = "<|audio_end|>";
 
 public:
+    static bool starts_with_jina_embedding_prefix(const std::string &text)
+    {
+        return text.rfind("Query: ", 0) == 0 || text.rfind("Document: ", 0) == 0;
+    }
+
     std::string apply_chat_template(const std::vector<Content> &contents, bool add_generation_prompt) override
     {
         // check contents type
@@ -50,33 +55,39 @@ public:
                     break;
                 case IMAGE:
                     text << "<|im_start|>user\n"
+                         << (starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
                          << img_start_token;
                     for (int i = 0; i < content.num_media * content.num_media_tokens; i++)
                     {
                         text << image_pad_token;
                     }
-                    text << img_end_token;
-                    text << content.data << "<|im_end|>\n";
+                    text << img_end_token
+                         << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << "<|im_end|>\n";
                     break;
                 case VIDEO:
                     text << "<|im_start|>user\n"
+                         << (starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
                          << img_start_token;
                     for (int i = 0; i < content.num_media * content.num_media_tokens; i++)
                     {
                         text << video_pad_token;
                     }
-                    text << img_end_token;
-                    text << content.data << "<|im_end|>\n";
+                    text << img_end_token
+                         << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << "<|im_end|>\n";
                     break;
                 case AUDIO:
                     text << "<|im_start|>user\n"
+                         << (starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
                          << audio_start_token;
                     for (int i = 0; i < content.num_media * content.num_media_tokens; i++)
                     {
                         text << audio_pad_token;
                     }
-                    text << audio_end_token;
-                    text << content.data << "<|im_end|>\n";
+                    text << audio_end_token
+                         << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << "<|im_end|>\n";
                     break;
                 default:
                     break;
