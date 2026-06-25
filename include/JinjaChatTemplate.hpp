@@ -72,10 +72,12 @@ public:
     }
 
     // Render the conversation. `extra_context` can carry template flags such as
-    // {"enable_thinking": false} or a "tools" array.
+    // {"enable_thinking": false}; `tools` is the optional tool/function list that
+    // tool-calling templates iterate over.
     std::string apply(const std::vector<Content> &contents,
                       bool add_generation_prompt = true,
-                      const json &extra_context = json::object()) const
+                      const json &extra_context = json::object(),
+                      const json &tools = json()) const
     {
         if (!tmpl_)
             return {};
@@ -83,6 +85,7 @@ public:
         in.messages = to_messages(contents);
         in.add_generation_prompt = add_generation_prompt;
         in.extra_context = extra_context;
+        in.tools = tools;
         // Deterministic clock so renders are reproducible (matches minja's test mode).
         in.now = std::chrono::system_clock::from_time_t(0);
 

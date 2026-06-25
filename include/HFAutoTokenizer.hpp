@@ -54,21 +54,24 @@ public:
     }
 
     // Render the conversation to a prompt string via the model's own jinja template.
+    // extra_context passes template flags (e.g. {"enable_thinking": false}); tools is
+    // the optional function list for tool-calling templates.
     std::string apply_chat_template(const std::vector<Content> &contents,
-                                    bool add_generation_prompt = true) const
+                                    bool add_generation_prompt = true,
+                                    const json &extra_context = json::object(),
+                                    const json &tools = json()) const
     {
-        return chat_.apply(contents, add_generation_prompt);
+        return chat_.apply(contents, add_generation_prompt, extra_context, tools);
     }
 
     // Render + tokenize. add_special_tokens=false because the chat template already
     // emits the special tokens as text; wangzhaode still recognises them as single ids.
-    //
-    // TODO(multimodal): for media Content the template emits a single <image_pad>-style
-    // placeholder; expand it to num_media_tokens copies here before/after encoding.
     std::vector<int> encode_chat(const std::vector<Content> &contents,
-                                 bool add_generation_prompt = true) const
+                                 bool add_generation_prompt = true,
+                                 const json &extra_context = json::object(),
+                                 const json &tools = json()) const
     {
-        return encode(apply_chat_template(contents, add_generation_prompt),
+        return encode(apply_chat_template(contents, add_generation_prompt, extra_context, tools),
                       /*add_special_tokens=*/false);
     }
 
