@@ -29,11 +29,23 @@ endfunction()
 option(TOKENIZER_BUILD_TESTS "Build tests" ON)
 MESSAGE(STATUS "TOKENIZER_BUILD_TESTS = ${TOKENIZER_BUILD_TESTS}")
 
+# Optional jinja chat templating (minja). Pulls in third_party/minja (header-only,
+# uses <regex> on the small template string only). Off-by-default builds stay lean
+# for edge targets that keep the hand-written templates.
+option(TOKENIZER_WITH_JINJA "Enable minja-based jinja chat templates" ON)
+MESSAGE(STATUS "TOKENIZER_WITH_JINJA = ${TOKENIZER_WITH_JINJA}")
+if(TOKENIZER_WITH_JINJA)
+    include_directories(third_party)
+endif()
+
 if(TOKENIZER_BUILD_TESTS)
     add_test(test_tokenizer)
     add_test(test_num2words_en)
     add_test(test_string_create)
     add_test(test_hf_parity)
+    if(TOKENIZER_WITH_JINJA)
+        add_test(test_jinja_parity)
+    endif()
 endif()
 
 
