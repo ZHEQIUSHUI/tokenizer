@@ -86,6 +86,14 @@ public:
     {
         this->generation_thinking_mode = mode;
     }
+    // Whether this tokenizer actually honors generation_thinking_mode in
+    // apply_chat_template (i.e. think/no_think really changes the prompt).
+    // Tokenizers that ignore the mode keep the default (false) so callers can
+    // warn instead of silently no-op'ing.
+    virtual bool supports_thinking_toggle() const
+    {
+        return false;
+    }
 
     virtual bool is_stop(int token) = 0;
     virtual void add_stop_token(int token) = 0;

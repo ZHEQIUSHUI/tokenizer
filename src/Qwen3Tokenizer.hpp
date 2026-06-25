@@ -150,10 +150,22 @@ public:
         if (contents.size() > 0 && contents.back().role == USER && add_generation_prompt)
         {
             text << "<|im_start|>assistant\n";
+            // Honor the thinking toggle, matching the official Qwen3 chat
+            // template: enable_thinking=false injects an empty think block so the
+            // model skips reasoning; think/unspecified keeps native behavior.
+            if (this->generation_thinking_mode == ThinkingMode::NoThink)
+            {
+                text << "<think>\n\n</think>\n\n";
+            }
         }
 
         // ALOGD("text: \n%s", text.str().c_str());
         return text.str();
+    }
+
+    bool supports_thinking_toggle() const override
+    {
+        return true;
     }
 };
 using qwen3vl_tokenizer = Qwen3Tokenizer<TEXT, IMAGE, VIDEO>;

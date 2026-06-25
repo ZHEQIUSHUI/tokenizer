@@ -12,6 +12,11 @@ template <ContentType... Types>
 class MiniCPM5Tokenizer : public BaseMixinTokenizer<Types...>
 {
 public:
+    bool supports_thinking_toggle() const override
+    {
+        return true;
+    }
+
     std::string apply_chat_template(const std::vector<Content> &contents, bool add_generation_prompt) override
     {
         for (const auto &content : contents)
