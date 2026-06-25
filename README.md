@@ -31,6 +31,10 @@
 | 23 | InternVL3_5 | InternVL3.5 多模态（1B/2B 共用） |
 | 24 | PaddleOCR_VL | Towards a Multi-Task 0.9B VLM for Robust In-the-Wild Document Parsing |
 | 25 | Gemma4 | Gemma4 多模态 (google/gemma-4-*-it) |
+| 26 | Gemma4VL | Gemma4 多模态 |
+| 27 | MiniCPMV46 | MiniCPM-V4.6 多模态 |
+| 28 | MiniCPMV46VL | MiniCPM-V4.6 多模态 |
+| 29 | MiniCPM5 | MiniCPM5 文本 |
 
 详见 [ModelType](include/BaseTokenizer.hpp#L6)
 
@@ -104,6 +108,69 @@ contents.push_back({USER, VIDEO, "帮我看看这个视频", 8, 256});
 ```
 
 
+## 直接加载 HuggingFace 目录（通用路径，可选）
+
+除了上面“转换成 `.txt` 再用”的精简路径，还提供一条**通用路径**：直接读取 HuggingFace 的 tokenizer 目录（`tokenizer.json` / `tokenizer_config.json` / `config.json`），**无需转换，也无需为新模型写代码**。底层分词用 [wangzhaode/tokenizer.cpp](https://github.com/wangzhaode/tokenizer.cpp)，对话模板用 [minja](https://github.com/google/minja) 渲染模型自带的 jinja 模板。
+
+> 这条路径会引入 oniguruma / utf8proc 等依赖，**默认关闭**；边缘 / 嵌入式构建保持精简的 `.txt` 路径即可，完全不受影响。
+
+### 构建
+```shell
+git submodule update --init                 # 拉取 third_party/tokenizer.cpp
+cmake -DTOKENIZER_WITH_HF_LOADER=ON ..
+make -j
+```
+
+### 使用
+```C++
+#include "HFAutoTokenizer.hpp"
+
+HFAutoTokenizer tok;
+tok.from_pretrained("/path/to/hf/tokenizer/dir");   // 直接读 HF 目录，无需转换
+
+// 纯分词
+std::vector<int> ids = tok.encode("你好");
+std::string text     = tok.decode(ids);
+
+// 对话模板（用模型自带 jinja，自动正确）
+std::vector<Content> contents = {
+    {SYSTEM, TEXT, "You are a helpful assistant."},
+    {USER,   TEXT, "你好"},
+};
+std::string prompt    = tok.apply_chat_template(contents);  // 拼好的字符串
+std::vector<int> cids = tok.encode_chat(contents);          // 渲染 + 编码
+
+// thinking / 工具调用：通过 extra_context / tools 传入
+tok.apply_chat_template(contents, true, {{"enable_thinking", false}});
+
+// 多模态：pad token 自动从 config.json 读取，零配置
+contents.push_back({USER, IMAGE, "看看这张图", /*num_media=*/1, /*num_media_tokens=*/256});
+auto mids = tok.encode_chat(contents);
+```
+
+### 两条路径对比
+| | 精简 `.txt` 路径 | 通用 HF 目录路径 |
+|---|---|---|
+| 入口 | `create_tokenizer(type)->load(".txt")` | `HFAutoTokenizer::from_pretrained(dir)` |
+| 需要转换 | 是（`convert_tokenizer.py`） | 否 |
+| 新模型 | 需注册 / 手写模板 | 多数零代码（仅特殊拼接逻辑例外） |
+| 依赖 | 极少 | + oniguruma / utf8proc |
+| 适合 | 边缘 / 嵌入式 | 服务器 / 开发，快速接入新模型 |
+| CMake | 默认 | `-DTOKENIZER_WITH_HF_LOADER=ON` |
+
+两套机制并存，互不影响；现有手写模板逻辑保持不变。
+
+### 只要 jinja 对话模板
+如果只想用 jinja 渲染对话模板（不更换分词引擎），用 `JinjaChatTemplate`（仅依赖 header-only 的 minja，`-DTOKENIZER_WITH_JINJA=ON`，默认开启）：
+```C++
+#include "JinjaChatTemplate.hpp"
+JinjaChatTemplate ct;
+ct.load_from_dir("/path/to/hf/dir");        // 或 ct.load(template_str, bos, eos)
+std::string prompt = ct.apply(contents);
+```
+
 ## reference
 - [mnn-llm](https://github.com/wangzhaode/mnn-llm)
 - [llm-export](https://github.com/wangzhaode/llm-export)
+- [tokenizer.cpp](https://github.com/wangzhaode/tokenizer.cpp)
+- [minja](https://github.com/google/minja)
