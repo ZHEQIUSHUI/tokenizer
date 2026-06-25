@@ -17,6 +17,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <sstream>
 
 #include "BaseTokenizer.hpp"        // Content
 #include "tokenizer.hpp"            // wangzhaode: tokenizer::AutoTokenizer
@@ -25,13 +27,16 @@
 class HFAutoTokenizer
 {
 public:
+    using json = JinjaChatTemplate::json;
+
     // Load tokenizer + chat template from a HuggingFace tokenizer directory.
     bool from_pretrained(const std::string &dir)
     {
         tok_ = tokenizer::AutoTokenizer::from_pretrained(dir);
         if (!tok_)
             return false;
-        chat_.load_from_dir(dir); // optional; ok if the model has no chat_template
+        chat_.load_from_dir(dir);   // optional; ok if the model has no chat_template
+        detect_media_pads(dir);     // zero-config multimodal: read pad tokens from config.json
         return true;
     }
 
@@ -70,4 +75,41 @@ public:
 private:
     std::shared_ptr<tokenizer::PreTrainedTokenizer> tok_;
     JinjaChatTemplate chat_;
+
+    // Auto-discover the per-modality placeholder tokens from config.json so multimodal
+    // works with no per-model setup. VL configs carry e.g. image_token_id / video_token_id
+    // (Qwen) or image_token_index (Llava); we decode those ids to their token strings.
+    // Falls back to the JinjaChatTemplate defaults (Qwen convention) when absent.
+    void detect_media_pads(const std::string &dir)
+    {
+        json cfg;
+        {
+            std::ifstream f(dir + "/config.json");
+            if (!f) return;
+            std::stringstream ss; ss << f.rdbuf();
+            try { cfg = json::parse(ss.str()); } catch (...) { return; }
+        }
+        // Search top level and one level of nesting (e.g. text_config / vision_config).
+        auto find_id = [&](std::initializer_list<const char *> keys) -> int {
+            for (const auto &kv : cfg.items()) {
+                const json &v = kv.value();
+                for (const char *k : keys) {
+                    if (kv.key() == k && v.is_number_integer()) return v.get<int>();
+                    if (v.is_object() && v.contains(k) && v[k].is_number_integer())
+                        return v[k].get<int>();
+                }
+            }
+            return -1;
+        };
+        auto pad_for = [&](std::initializer_list<const char *> keys, const std::string &dflt) {
+            int id = find_id(keys);
+            if (id < 0) return dflt;
+            std::string s = tok_->decode({id}, /*skip_special_tokens=*/false);
+            return s.empty() ? dflt : s;
+        };
+        chat_.set_media_pads(
+            pad_for({"image_token_id", "image_token_index"}, "<|image_pad|>"),
+            pad_for({"video_token_id", "video_token_index"}, "<|video_pad|>"),
+            pad_for({"audio_token_id", "audio_token_index"}, "<|audio_pad|>"));
+    }
 };
