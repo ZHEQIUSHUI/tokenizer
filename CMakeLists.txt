@@ -62,6 +62,8 @@ if(TOKENIZER_BUILD_TESTS)
     if(TOKENIZER_WITH_HF_LOADER)
         add_executable(test_hf_loader tests/test_hf_loader.cpp)
         target_link_libraries(test_hf_loader tokenizer tokenizer_lib)
+        add_executable(test_mm_compare tests/test_mm_compare.cpp)
+        target_link_libraries(test_mm_compare tokenizer tokenizer_lib)
     endif()
 endif()
 
