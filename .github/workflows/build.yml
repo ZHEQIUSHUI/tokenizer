@@ -29,12 +29,35 @@ jobs:
           set -e
           ./build/test_string_create
           ./build/test_hf_parity tests
+          ./build/test_jinja_parity tests
 
       - name: Upload x86 artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-x86
           path: build/install/
+
+  build-x86-hf-loader:
+    name: x86 Build (HF loader)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build with HF loader (wangzhaode/tokenizer.cpp + oniguruma)
+        run: |
+          set -e
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DTOKENIZER_WITH_HF_LOADER=ON ..
+          make -j$(nproc)
+
+      - name: Run tests
+        run: |
+          set -e
+          ./build/test_string_create
+          ./build/test_jinja_parity tests
+          ./build/test_hf_loader   # skips when no model dir is present (CI), exits 0
 
   build-aarch64:
     name: aarch64 Build
