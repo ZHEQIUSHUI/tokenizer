@@ -30,8 +30,14 @@ int main(int argc, char** argv){
     // Templates that embed the current date (via strftime_now) render through
     // minja's std::localtime. Pin the zone so the fixed epoch-0 clock used in
     // JinjaChatTemplate::apply yields a stable "1970-01-01" matching the golden.
+    // setenv is POSIX-only; MSVC/MinGW use _putenv_s / _tzset.
+#ifdef _WIN32
+    _putenv_s("TZ", "UTC");
+    _tzset();
+#else
     setenv("TZ", "UTC", 1);
     tzset();
+#endif
     const std::string base = (argc > 1) ? argv[1] : "tests";
     std::ifstream f(base + "/golden/chat_templates.json");
     if (!f) { fprintf(stderr, "cannot read %s/golden/chat_templates.json\n", base.c_str()); return 2; }
