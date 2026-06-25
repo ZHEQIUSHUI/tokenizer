@@ -62,6 +62,15 @@ public:
 
     bool ready() const { return tmpl_ != nullptr; }
 
+    // Override the placeholder token a model's template emits per image/video/audio.
+    // Defaults follow the Qwen convention; set these for other model families.
+    void set_media_pads(const std::string &image, const std::string &video, const std::string &audio)
+    {
+        image_pad_ = image;
+        video_pad_ = video;
+        audio_pad_ = audio;
+    }
+
     // Render the conversation. `extra_context` can carry template flags such as
     // {"enable_thinking": false} or a "tools" array.
     std::string apply(const std::vector<Content> &contents,
@@ -81,11 +90,55 @@ public:
         opt.apply_polyfills = false;   // render the template verbatim, like HF tokenize=False
         opt.use_bos_token = false;     // the template emits bos/eos itself where it wants them
         opt.use_eos_token = false;
-        return tmpl_->apply(in, opt);
+        std::string out = tmpl_->apply(in, opt);
+
+        // The template emits one placeholder per media item; expand each to the
+        // item's num_media_tokens copies (the per-image token count is a runtime
+        // concern, exactly as HF's processor does it after apply_chat_template).
+        expand_media_pads(out, contents);
+        return out;
     }
 
 private:
     std::shared_ptr<minja::chat_template> tmpl_;
+    // Per-modality placeholder tokens (Qwen convention by default).
+    std::string image_pad_ = "<|image_pad|>";
+    std::string video_pad_ = "<|video_pad|>";
+    std::string audio_pad_ = "<|audio_pad|>";
+
+    // Replace each single placeholder the template emitted with num_media_tokens
+    // copies, in render order (which equals Content order). Text-only -> no-op.
+    void expand_media_pads(std::string &s, const std::vector<Content> &contents) const
+    {
+        struct Job { const std::string *pad; int count; };
+        std::vector<Job> jobs;
+        for (const auto &c : contents) {
+            if (c.type == TEXT || c.num_media_tokens <= 0)
+                continue;
+            const std::string *pad = c.type == IMAGE ? &image_pad_
+                                   : c.type == VIDEO ? &video_pad_ : &audio_pad_;
+            if (pad->empty())
+                continue;
+            const int items = c.num_media > 0 ? c.num_media : 1;
+            for (int i = 0; i < items; ++i)
+                jobs.push_back({pad, c.num_media_tokens});
+        }
+        if (jobs.empty())
+            return;
+        size_t pos = 0;
+        for (const auto &job : jobs) {
+            const std::string &pad = *job.pad;
+            const size_t p = s.find(pad, pos);
+            if (p == std::string::npos)
+                break; // template emitted fewer placeholders than expected
+            std::string rep;
+            rep.reserve(pad.size() * (size_t)job.count);
+            for (int i = 0; i < job.count; ++i)
+                rep += pad;
+            s.replace(p, pad.size(), rep);
+            pos = p + rep.size();
+        }
+    }
 
     static std::string role_name(RoleType r)
     {
