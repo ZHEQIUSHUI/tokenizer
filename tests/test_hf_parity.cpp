@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
         if (!tok) { fprintf(stderr, "[%s] FAILED to load %s\n", model.c_str(), asset.c_str()); ++models_failed; continue; }
         const auto gold = read_golden(golden);
 
-        int mism = 0;
+        int mism = 0, dec_mism = 0;
         const size_t n = std::min(corpus.size(), gold.size());
         for (size_t i = 0; i < n; ++i) {
             std::vector<int> ids = tok->encode(corpus[i]);
@@ -103,11 +103,22 @@ int main(int argc, char** argv) {
                 }
                 ++mism;
             }
+            // decode round-trip: decoding the HF ids should reconstruct the input.
+            std::string dec;
+            for (int id : gold[i]) dec += tok->decode(id);
+            if (dec != corpus[i]) {
+                if (dec_mism < 2)
+                    fprintf(stderr, "  [%s] line %zu decode mismatch\n     in : %s\n     out: %s\n",
+                            model.c_str(), i, corpus[i].c_str(), dec.c_str());
+                ++dec_mism;
+            }
         }
         delete tok;
-        printf("%s %-26s %zu/%zu lines match HF\n", mism == 0 ? "[ OK ]" : "[FAIL]", model.c_str(), n - mism, n);
-        total_mismatch += mism;
-        if (mism) ++models_failed;
+        printf("%s %-26s encode %zu/%zu, decode round-trip %zu/%zu\n",
+               (mism == 0 && dec_mism == 0) ? "[ OK ]" : "[FAIL]",
+               model.c_str(), n - mism, n, n - dec_mism, n);
+        total_mismatch += mism + dec_mism;
+        if (mism || dec_mism) ++models_failed;
     }
 
     printf("\n%d/%d encodings match HF (%d models checked, %d skipped, %d failed)\n",
