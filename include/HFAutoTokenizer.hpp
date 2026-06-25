@@ -1,0 +1,73 @@
+#pragma once
+// General "load a HuggingFace tokenizer directory and just use it" entry point.
+//
+//   encode/decode        -> wangzhaode/tokenizer.cpp (reads tokenizer.json directly,
+//                           handles BPE/WordPiece/Unigram + normalizers, no conversion)
+//   apply_chat_template  -> minja, rendering the model's own chat_template (more robust
+//                           than the bundled jinja; see JinjaChatTemplate.hpp)
+//
+// This is the "general leg": no per-model C++ for new models. The only thing that
+// still needs per-model handling is multimodal pad-token expansion (the chat template
+// emits one placeholder per image; expanding it to N is a runtime concern) -- see
+// encode_chat() below.
+//
+// Optional: requires TOKENIZER_WITH_HF_LOADER (pulls in third_party/tokenizer.cpp +
+// oniguruma). Off-by-default builds keep the lean .txt + hand-written path.
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "BaseTokenizer.hpp"        // Content
+#include "tokenizer.hpp"            // wangzhaode: tokenizer::AutoTokenizer
+#include "JinjaChatTemplate.hpp"    // minja-based chat templating
+
+class HFAutoTokenizer
+{
+public:
+    // Load tokenizer + chat template from a HuggingFace tokenizer directory.
+    bool from_pretrained(const std::string &dir)
+    {
+        tok_ = tokenizer::AutoTokenizer::from_pretrained(dir);
+        if (!tok_)
+            return false;
+        chat_.load_from_dir(dir); // optional; ok if the model has no chat_template
+        return true;
+    }
+
+    bool ready() const { return tok_ != nullptr; }
+    bool has_chat_template() const { return chat_.ready(); }
+
+    std::vector<int> encode(const std::string &text, bool add_special_tokens = true) const
+    {
+        return tok_ ? tok_->encode(text, add_special_tokens) : std::vector<int>{};
+    }
+
+    std::string decode(const std::vector<int> &ids, bool skip_special_tokens = true) const
+    {
+        return tok_ ? tok_->decode(ids, skip_special_tokens) : std::string{};
+    }
+
+    // Render the conversation to a prompt string via the model's own jinja template.
+    std::string apply_chat_template(const std::vector<Content> &contents,
+                                    bool add_generation_prompt = true) const
+    {
+        return chat_.apply(contents, add_generation_prompt);
+    }
+
+    // Render + tokenize. add_special_tokens=false because the chat template already
+    // emits the special tokens as text; wangzhaode still recognises them as single ids.
+    //
+    // TODO(multimodal): for media Content the template emits a single <image_pad>-style
+    // placeholder; expand it to num_media_tokens copies here before/after encoding.
+    std::vector<int> encode_chat(const std::vector<Content> &contents,
+                                 bool add_generation_prompt = true) const
+    {
+        return encode(apply_chat_template(contents, add_generation_prompt),
+                      /*add_special_tokens=*/false);
+    }
+
+private:
+    std::shared_ptr<tokenizer::PreTrainedTokenizer> tok_;
+    JinjaChatTemplate chat_;
+};
