@@ -20,10 +20,48 @@ protected:
     std::string audio_end_token = "<|audio_end|>";
 
 public:
+    bool load(const std::string tokenizer_path) override
+    {
+        if (!BaseMixinTokenizer<Types...>::load(tokenizer_path)) {
+            return false;
+        }
+        adapt_placeholder_tokens_for_runtime();
+        return true;
+    }
+
     static bool starts_with_jina_embedding_prefix(const std::string &text)
     {
         return text.rfind("Query: ", 0) == 0 || text.rfind("Document: ", 0) == 0;
     }
+
+private:
+    bool has_single_token_id(const std::string &text) const
+    {
+        auto ids = this->tokenizer->encode(text);
+        return ids.size() == 1;
+    }
+
+    void adapt_placeholder_tokens_for_runtime()
+    {
+        if (!has_single_token_id(image_pad_token) && has_single_token_id("<image>")) {
+            image_pad_token = "<image>";
+        }
+        if (!has_single_token_id(video_pad_token)) {
+            if (has_single_token_id("<video>")) {
+                video_pad_token = "<video>";
+            } else if (has_single_token_id(image_pad_token)) {
+                video_pad_token = image_pad_token;
+            }
+        }
+        if (!has_single_token_id(img_start_token)) {
+            img_start_token.clear();
+        }
+        if (!has_single_token_id(img_end_token)) {
+            img_end_token.clear();
+        }
+    }
+
+public:
 
     std::string apply_chat_template(const std::vector<Content> &contents, bool add_generation_prompt) override
     {
