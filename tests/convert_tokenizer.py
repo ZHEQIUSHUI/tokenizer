@@ -268,6 +268,16 @@ class LlmExporter():
             self.sp_model = None
         self.merge_txt = self._resolve_local_file('merges.txt')
         tokenizer_json_bpe = self._load_tokenizer_json_bpe()
+        # Qwen2/Qwen3 are GPT-2 byte-level BPE. Whether the loaded tokenizer exposes
+        # `mergeable_ranks` (tiktoken-style) varies across transformers versions: older
+        # ones do -> the tiktoken longest-match path below produces token ids that don't
+        # match HF (e.g. "Determine" -> [92648,68] not [35,24308]); newer ones don't.
+        # To be version-independent, whenever this is a Qwen2/Qwen3 tokenizer that has an
+        # HF BPE in tokenizer.json, always export via tokenizer.json (HUGGINGFACE type 3,
+        # clean official merges) — skip both the tiktoken and the merges.txt paths.
+        _tok_cls = type(self.tokenizer).__name__ if self.tokenizer is not None else ''
+        is_qwen_bpe = ('Qwen2Tokenizer' in _tok_cls) or ('Qwen3Tokenizer' in _tok_cls)
+        qwen_prefer_tokenizer_json = is_qwen_bpe and (tokenizer_json_bpe is not None)
         force_huggingface_export = self.is_fastvlm and (self.merge_txt is not None)
         # TOKENIZER MAGIC NUMBER
         MAGIC_NUMBER = 430
@@ -357,7 +367,7 @@ class LlmExporter():
                     fp.write(f'{len(vocab_list)}\n')
                 for vocab in vocab_list:
                     fp.write(vocab)
-        elif hasattr(self.tokenizer, 'mergeable_ranks') and not force_huggingface_export:
+        elif hasattr(self.tokenizer, 'mergeable_ranks') and not force_huggingface_export and not qwen_prefer_tokenizer_json:
             # tikton
             vocab_list = []
             for k, v in self.tokenizer.mergeable_ranks.items():
