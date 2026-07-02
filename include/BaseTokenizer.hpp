@@ -35,6 +35,8 @@ enum ModelType
     MiniCPMV46,   // 27
     MiniCPMV46VL, // 28
     MiniCPM5,     // 29
+    Phi4,         // 30 (microsoft/phi-4; HF byte-level BPE, im_sep template)
+    Phi4Mini,     // 31 (microsoft/Phi-4-mini-instruct; HF byte-level BPE)
 };
 
 enum RoleType
