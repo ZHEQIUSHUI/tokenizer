@@ -5,6 +5,7 @@
 #include "BaseMixinTokenizer.hpp"
 #include "utils/object_register.hpp"
 #include "utils/sample_log.h"
+#include "utils/json.hpp"
 
 template <ContentType... Types>
 class Qwen3Tokenizer : public BaseMixinTokenizer<Types...>
@@ -63,6 +64,24 @@ private:
 
 public:
 
+    // Render the request's tools (Qwen3 format) into the system-prompt tool section.
+    std::string render_tools_section() const
+    {
+        if (this->tools_json_.empty()) return {};
+        nlohmann::json tools;
+        try { tools = nlohmann::json::parse(this->tools_json_); } catch (...) { return {}; }
+        if (!tools.is_array() || tools.empty()) return {};
+        std::string s;
+        s += "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\n";
+        s += "You are provided with function signatures within <tools></tools> XML tags:\n<tools>";
+        for (const auto &t : tools) s += "\n" + t.dump();
+        s += "\n</tools>\n\n";
+        s += "For each function call, return a json object with function name and arguments within "
+             "<tool_call></tool_call> XML tags:\n<tool_call>\n"
+             "{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call>";
+        return s;
+    }
+
     std::string apply_chat_template(const std::vector<Content> &contents, bool add_generation_prompt) override
     {
         // check contents type
@@ -75,13 +94,21 @@ public:
             }
         }
 
+        const std::string tools_section = render_tools_section();
+        bool has_system = false;
+        for (const auto &c : contents) if (c.role == SYSTEM) { has_system = true; break; }
+
         std::stringstream text;
+        if (!tools_section.empty() && !has_system)
+            text << "<|im_start|>system\nYou are a helpful assistant." << tools_section << "<|im_end|>\n";
         for (const auto &content : contents)
         {
             if (content.role == SYSTEM)
             {
                 text << "<|im_start|>system\n"
-                     << content.data << "<|im_end|>\n";
+                     << content.data;
+                if (!tools_section.empty()) text << tools_section;
+                text << "<|im_end|>\n";
             }
             else if (content.role == USER)
             {

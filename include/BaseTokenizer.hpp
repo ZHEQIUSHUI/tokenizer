@@ -76,6 +76,7 @@ protected:
     // 是否在上下文中保留thinking内容, 默认为false
     bool think_in_prompt = false;
     ThinkingMode generation_thinking_mode = ThinkingMode::Unspecified;
+    std::string tools_json_; // OpenAI "tools" array as JSON text; empty = none (rendered by tool-capable tokenizers)
 
 public:
     virtual bool load(const std::string tokenizer_path) = 0;
@@ -87,6 +88,12 @@ public:
     virtual void set_generation_thinking_mode(ThinkingMode mode)
     {
         this->generation_thinking_mode = mode;
+    }
+    // Provide the request's OpenAI tool list (JSON text). Tool-capable tokenizers render
+    // it into the prompt; others ignore it. Pass "" to clear.
+    virtual void set_tools(const std::string &tools_json)
+    {
+        this->tools_json_ = tools_json;
     }
     // Whether this tokenizer actually honors generation_thinking_mode in
     // apply_chat_template (i.e. think/no_think really changes the prompt).
