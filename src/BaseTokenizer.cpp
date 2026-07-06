@@ -19,6 +19,7 @@
 #include "MiniMaxM2Tokenizer.hpp"
 #include "PaddleOCRVLTokenizer.hpp"
 #include "MiniCPMV46Tokenizer.hpp"
+#include "LocateAnythingTokenizer.hpp"
 #include "MiniCPM5Tokenizer.hpp"
 #include "PhiTokenizer.hpp"
 
