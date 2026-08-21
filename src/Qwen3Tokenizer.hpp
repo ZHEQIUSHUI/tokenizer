@@ -19,6 +19,9 @@ protected:
     std::string img_end_token = "<|vision_end|>";
     std::string audio_start_token = "<|audio_start|>";
     std::string audio_end_token = "<|audio_end|>";
+    // Some audio models (MOSS-Transcribe-Diarize) keep the user prompt on the
+    // line following `<|audio_end|>`, matching their Python chat-template.
+    bool audio_end_newline_ = false;
 
 public:
     bool load(const std::string tokenizer_path) override
@@ -150,7 +153,9 @@ public:
                     {
                         text << audio_pad_token;
                     }
-                    text << audio_end_token
+                    text << audio_end_token;
+                    if (audio_end_newline_) text << "\n";
+                    text
                          << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
                          << "<|im_end|>\n";
                     break;
@@ -207,3 +212,17 @@ using qwen3_5_tokenizer = Qwen3Tokenizer<TEXT>;
 REGISTER(Qwen3_5, qwen3_5_tokenizer)
 using qwen3_5vl_tokenizer = Qwen3Tokenizer<TEXT, IMAGE, VIDEO>;
 REGISTER(Qwen3_5VL, qwen3_5vl_tokenizer)
+
+// MOSS-Transcribe-Diarize uses Qwen3's im_start/im_end skeleton with one audio
+// placeholder. Its Python chat template inserts a newline after
+// `<|audio_end|>` and before the transcription instruction.
+class MossTranscribeDiarizeTokenizer : public Qwen3Tokenizer<TEXT, AUDIO>
+{
+public:
+    MossTranscribeDiarizeTokenizer()
+    {
+        this->audio_end_newline_ = true;
+    }
+};
+using moss_transcribe_diarize_tokenizer = MossTranscribeDiarizeTokenizer;
+REGISTER(MossTranscribeDiarize, moss_transcribe_diarize_tokenizer)
