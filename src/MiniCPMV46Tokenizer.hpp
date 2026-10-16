@@ -78,6 +78,8 @@ public:
     // Render the request's tools (Qwen3 <tool_call> format) into the system-prompt
     // tool section. MiniCPM-V-4.6 uses the Qwen3.5 text backbone / ChatML template,
     // so it shares Qwen3's tool convention; keep this in sync with Qwen3Tokenizer.
+    bool supports_tools() const override { return true; }
+
     std::string render_tools_section() const
     {
         if (this->tools_json_.empty()) return {};
