@@ -68,6 +68,8 @@ private:
 public:
 
     // Render the request's tools (Qwen3 format) into the system-prompt tool section.
+    bool supports_tools() const override { return true; }
+
     std::string render_tools_section() const
     {
         if (this->tools_json_.empty()) return {};

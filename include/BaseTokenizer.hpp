@@ -97,6 +97,12 @@ public:
     {
         this->tools_json_ = tools_json;
     }
+    // Whether apply_chat_template renders set_tools() into the prompt (and the model's
+    // <tool_call> output convention is known). Others ignore tools.
+    virtual bool supports_tools() const
+    {
+        return false;
+    }
     // Whether this tokenizer actually honors generation_thinking_mode in
     // apply_chat_template (i.e. think/no_think really changes the prompt).
     // Tokenizers that ignore the mode keep the default (false) so callers can
