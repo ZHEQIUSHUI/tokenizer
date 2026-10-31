@@ -70,6 +70,10 @@ struct Content
     std::string data;
     int num_media = 0;        // 多模态数量
     int num_media_tokens = 0; // 多模态token pad数量
+    // [Qwen3.5-order-fix] content-parts order: true = media rendered before text
+    // (legacy axllm behavior), false = text before media (HF processor convention
+    // when the client sends [{"type":"text"},...,{"type":"image_url"},...]).
+    bool media_before_text = true;
 };
 
 class BaseTokenizer
