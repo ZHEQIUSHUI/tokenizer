@@ -124,32 +124,49 @@ public:
                          << content.data << "<|im_end|>\n";
                     break;
                 case IMAGE:
+                {
+                    // [Qwen3.5-order-fix] honor content-part order: HF processors keep
+                    // [{"type":"text"},{"type":"image_url"}] as text-then-image; legacy
+                    // axllm always rendered media first. jina embedding prefix keeps its
+                    // special ordering (text first regardless).
+                    const bool media_first = content.media_before_text &&
+                                             !starts_with_jina_embedding_prefix(content.data);
                     text << "<|im_start|>user\n"
-                         << (starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << (media_first ? std::string() : content.data)
                          << img_start_token;
                     for (int i = 0; i < content.num_media * content.num_media_tokens; i++)
                     {
                         text << image_pad_token;
                     }
                     text << img_end_token
-                         << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << (media_first ? content.data : std::string())
                          << "<|im_end|>\n";
                     break;
+                }
                 case VIDEO:
+                {
+                    // [Qwen3.5-order-fix] same content-part ordering as IMAGE
+                    const bool media_first = content.media_before_text &&
+                                             !starts_with_jina_embedding_prefix(content.data);
                     text << "<|im_start|>user\n"
-                         << (starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << (media_first ? std::string() : content.data)
                          << img_start_token;
                     for (int i = 0; i < content.num_media * content.num_media_tokens; i++)
                     {
                         text << video_pad_token;
                     }
                     text << img_end_token
-                         << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << (media_first ? content.data : std::string())
                          << "<|im_end|>\n";
                     break;
+                }
                 case AUDIO:
+                {
+                    // [Qwen3.5-order-fix] same content-part ordering as IMAGE
+                    const bool media_first = content.media_before_text &&
+                                             !starts_with_jina_embedding_prefix(content.data);
                     text << "<|im_start|>user\n"
-                         << (starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << (media_first ? std::string() : content.data)
                          << audio_start_token;
                     for (int i = 0; i < content.num_media * content.num_media_tokens; i++)
                     {
@@ -158,9 +175,10 @@ public:
                     text << audio_end_token;
                     if (audio_end_newline_) text << "\n";
                     text
-                         << (!starts_with_jina_embedding_prefix(content.data) ? content.data : std::string())
+                         << (media_first ? content.data : std::string())
                          << "<|im_end|>\n";
                     break;
+                }
                 default:
                     break;
                 }
